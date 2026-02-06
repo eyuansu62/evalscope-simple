@@ -165,25 +165,43 @@ def _get_attr(obj: Any, key: str, default: Any = None) -> Any:
     return getattr(obj, key, default)
 
 
+def _message_text_for_completion(message: ChatMessage) -> str:
+    """Extract plain text from a ChatMessage for completion prompts."""
+    if isinstance(message.content, str):
+        content_text = message.content
+    else:
+        parts: List[str] = []
+        for content in message.content:
+            if content.type == 'text':
+                parts.append(content.text)
+            elif content.type == 'reasoning':
+                parts.append(content.reasoning)
+            else:
+                raise ValueError('Completion endpoint only supports text content.')
+        content_text = '\n'.join(parts)
+
+    # Strip markdown-style role prefix if upstream code already formatted it.
+    content_text = re.sub(
+        r'^\s*\*\*(?:System|User|Assistant|Tool)\*\*:\s*',
+        '',
+        content_text,
+        flags=re.IGNORECASE,
+    )
+    return content_text
+
+
 def openai_prompt_from_messages(messages: List[ChatMessage]) -> str:
     """Convert chat messages into a plain-text prompt for text completion endpoints."""
     if not messages:
         return ''
 
-    # Preserve simple single-turn prompts as-is.
-    if len(messages) == 1 and messages[0].role == 'user' and isinstance(messages[0].content, str):
-        return messages[0].content
+    # Preserve single-turn user prompts as-is, regardless of content encoding.
+    if len(messages) == 1 and messages[0].role == 'user':
+        return _message_text_for_completion(messages[0])
 
     parts: List[str] = []
     for message in messages:
-        # Completion endpoints only support text content.
-        if isinstance(message.content, list):
-            for content in message.content:
-                if content.type not in ('text', 'reasoning'):
-                    raise ValueError('Completion endpoint only supports text content.')
-            content_text = message.text
-        else:
-            content_text = message.content
+        content_text = _message_text_for_completion(message)
 
         role = message.role.capitalize()
         parts.append(f'{role}: {content_text}')
