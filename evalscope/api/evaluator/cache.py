@@ -250,6 +250,12 @@ class ModelResult(BaseModel):
     messages: List[ChatMessage] = []
     """Chat messages exchanged during evaluation (for conversational models)."""
 
+    input_text: Optional[str] = None
+    """Raw string input when sample input is plain text."""
+
+    input_messages: Optional[List[ChatMessage]] = None
+    """Raw structured input when sample input is chat messages."""
+
     metadata: Optional[Dict[str, Any]] = None
     """Additional metadata associated with the model result."""
 
@@ -264,10 +270,15 @@ class ModelResult(BaseModel):
         Returns:
             ModelResult object ready for caching
         """
+        raw_input_text = task_state.input if isinstance(task_state.input, str) else None
+        raw_input_messages = task_state.input if isinstance(task_state.input, list) else None
+
         return cls(
             model=task_state.model,
             index=task_state.sample_id,
             messages=task_state.messages,
+            input_text=raw_input_text,
+            input_messages=raw_input_messages,
             model_output=task_state.output,
             metadata=task_state.metadata if save_metadata else {},
         )
@@ -327,6 +338,12 @@ class ReviewResult(BaseModel):
     input: str = ''
     """Original input from the sample (immutable reference)."""
 
+    input_text: Optional[str] = None
+    """Raw string input when sample input is plain text."""
+
+    input_messages: Optional[List[ChatMessage]] = None
+    """Raw structured input when sample input is chat messages."""
+
     target: Optional[str] = None
     """Expected/target answer for the sample, if available."""
 
@@ -351,9 +368,14 @@ class ReviewResult(BaseModel):
             sample_score = copy.deepcopy(sample_score)
             sample_score.sample_metadata = None
 
+        raw_input_text = state.input if isinstance(state.input, str) else None
+        raw_input_messages = state.input if isinstance(state.input, list) else None
+
         return cls(
             index=state.sample_id,
             input=state.input_markdown,
+            input_text=raw_input_text,
+            input_messages=raw_input_messages,
             target=state.target,
             sample_score=sample_score,
         )
